@@ -1,5 +1,28 @@
 use std::io::{self, Write};
+use std::path::PathBuf;
 use std::process::Command;
+use std::env::{set_current_dir, current_dir};
+
+fn parse_line(line: &str) -> Vec<String> {
+    let mut is_quote = false;
+    let mut token = String::new();
+    let mut tokens = Vec::new();
+    for c in line.chars() {
+       if c == '"'  {
+        is_quote = !is_quote;
+       } else if c.is_whitespace() && !is_quote  {
+           tokens.push(token.clone());
+           token.clear();
+       } else {
+        token.push(c)
+       }
+    }
+    if !token.is_empty() {
+        tokens.push(token);
+    }
+    
+    tokens
+}
 
 fn read_command() -> io::Result<Vec<String>> {
     print!("$ ");
@@ -8,10 +31,7 @@ fn read_command() -> io::Result<Vec<String>> {
     let mut command = String::new();
     io::stdin().read_line(&mut command)?;
 
-    let v = command
-        .split_whitespace()
-        .map(|x| x.to_string())
-        .collect::<Vec<String>>();
+    let v = parse_line(&command);
     Ok(v)
 }
 
@@ -27,13 +47,24 @@ fn main() {
         }
 
         if command == "cd" {
-            match args.first() {
-                Some(dir) => {
-                    if let Err(e) = std::env::set_current_dir(dir) {
-                        println!("cd: {}", e)
-                    };
+            let path = match args.first() {
+            Some(dir) => PathBuf::from(dir),
+            None => match std::env::home_dir() {
+                Some(home) => home,
+                None => {
+                    println!("...");
+                    continue;
                 }
-                None => println!("cd: no path"),
+            },
+        };
+            let Ok(()) = set_current_dir(path) else { println!("Invalid path"); continue };
+            continue;
+        }
+
+        if command == "pwd" {
+            match current_dir() {
+                Ok(path) => println!("{}", path.display()),
+                Err(e) => println!("ERROR: {}", e),
             }
             continue;
         }
@@ -45,3 +76,17 @@ fn main() {
         }
     }
 }
+
+/*
+is_guillemet = false
+pour chaque caractère c :
+    si c == guillemet :
+        is_guillemet = !is_guillemet
+    sinon si c == espace ET pas dans un guillemet :
+        
+        tokens.push(token)
+        token.clear()
+    sinon :
+        token.push(c)
+*/
+
